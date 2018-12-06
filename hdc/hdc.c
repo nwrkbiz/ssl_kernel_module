@@ -138,7 +138,7 @@ static int hdc_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id hdc_of_match[] = {
-	{ .compatible = "unknown,unknown-1.0", },
+	{ .compatible = "ssl,hdc1000-1.0", },
 	{ },
 };
 MODULE_DEVICE_TABLE(of, hdc_of_match);
