@@ -16,23 +16,89 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/of.h>
+#include <linux/of_irq.h>
 #include <linux/io.h>
 #include <linux/miscdevice.h>
 #include <linux/fs.h>
 #include <linux/uaccess.h>
+#include <linux/interrupt.h>
+#include <linux/mutex.h>
+#include <linux/signal.h>
+#include <linux/sched.h> 
+#include <asm/siginfo.h>	
 
 #define DRIVER_NAME "mpu"
 
-#define NUM_REGS 37
-#define CHAR_DEVICE_SIZE (NUM_REGS * 4)
+#define SIG_TEST 44	
 
+#define NUM_REGS 45
+#define CHAR_DEVICE_SIZE ((NUM_REGS) * 4)
 
 struct altera_mpu {
 	void *regs;
 	char buffer[CHAR_DEVICE_SIZE];
+	char pid_buffer[CHAR_DEVICE_SIZE];
 	int size;
+	int irq_num;
+	struct mutex mutex_lock;
 	struct miscdevice misc;
 };
+
+/*
+ * @brief Lock character device if opened once.
+ * @return EBUSY if device is already opened.
+ */
+static int lock_misc(struct inode *inode, struct file *filep)
+{
+	struct altera_mpu *mpu = container_of(filep->private_data,
+				       struct altera_mpu, misc);
+
+	if (!mutex_trylock(&mpu->mutex_lock))
+		return -EBUSY;
+
+	return 0;
+}
+
+/*
+ * @brief Unlock character device after closing it.
+ */
+static int release_misc(struct inode *inode, struct file *filep)
+{
+	struct altera_mpu *mpu = container_of(filep->private_data,
+				       struct altera_mpu, misc);
+
+	mutex_unlock(&mpu->mutex_lock);
+	return 0;
+}
+
+
+/*
+ * @brief IRQ handler function.
+ */
+static irqreturn_t irq_handler(int irq, void *dev_id)
+{
+	struct altera_mpu *mpu = dev_id;
+	int pid = 0;
+	struct siginfo info;
+   	struct task_struct *t;
+
+	if(kstrtoint(mpu->pid_buffer, 10, &pid) != 0)
+		return IRQ_HANDLED;
+
+        t = pid_task(find_vpid(pid), PIDTYPE_PID);
+	if(t == NULL)
+		return IRQ_HANDLED;
+
+	memset(&info, 0, sizeof(struct siginfo));
+	info.si_signo = SIG_TEST;
+	info.si_code = SI_QUEUE;
+	info.si_int = 1234;  
+
+	/* Tell userspace that IRQ occured */
+	send_sig_info(SIG_TEST, &info, t);
+
+	return IRQ_HANDLED;
+}
 
 /*
  * @brief This function gets executed on fread.
@@ -63,7 +129,7 @@ static int mpu_read(struct file *filep, char *buf, size_t count,
 /*
  * @brief This function gets executed on fwrite.
  */
-/*static int mpu_write(struct file *filep, const char *buf,
+static int mpu_write(struct file *filep, const char *buf,
 			  size_t count, loff_t *offp)
 {
 	struct altera_mpu *mpu = container_of(filep->private_data,
@@ -76,7 +142,7 @@ static int mpu_read(struct file *filep, char *buf, size_t count,
 		count = CHAR_DEVICE_SIZE - *offp;
 
 	if (count > 0) {
-		count = count - copy_from_user(mpu->buffer + *offp,
+		count = count - copy_from_user(mpu->pid_buffer + *offp,
 					       buf,
 					       count);
 	}
@@ -85,12 +151,14 @@ static int mpu_read(struct file *filep, char *buf, size_t count,
 
 	*offp += count;
 	return count;
-} */
+}
 
 static const struct file_operations mpu_fops = {
 	.owner = THIS_MODULE,
 	.read = mpu_read,
-	//.write = mpu_write
+	.write = mpu_write,
+	.open = lock_misc,
+	.release = release_misc
 };
 
 static int mpu_probe(struct platform_device *pdev)
@@ -110,16 +178,25 @@ static int mpu_probe(struct platform_device *pdev)
 		return PTR_ERR(mpu->regs);
 	mpu->size = io->end - io->start + 1;
 
+
 	mpu->misc.name = DRIVER_NAME;
 	mpu->misc.minor = MISC_DYNAMIC_MINOR;
 	mpu->misc.fops = &mpu_fops;
 	mpu->misc.parent = &pdev->dev;
 	retval = misc_register(&mpu->misc);
+
+	mpu->irq_num = irq_of_parse_and_map(pdev->dev.of_node, 0);
+
+	retval = devm_request_irq(&pdev->dev, mpu->irq_num, irq_handler,
+				  IRQF_SHARED,
+				  DRIVER_NAME, mpu);
+
 	if (retval) {
 		dev_err(&pdev->dev, "Register misc device failed!\n");
 		return retval;
 	}
 
+	mutex_init(&mpu->mutex_lock);
 	dev_info(&pdev->dev, "mpu driver loaded!");
 
 	return 0;
