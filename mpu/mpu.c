@@ -28,6 +28,9 @@
 #include <asm/siginfo.h>	
 
 #define DRIVER_NAME "mpu"
+#define PID_OFFSET 13
+#define TOLERANCE_CONFIG_OFFSET 24
+#define TOLERANCE_CONFIG_SIZE PID_OFFSET - 1 
 
 #define SIG_TEST 44	
 
@@ -37,8 +40,9 @@
 struct altera_mpu {
 	void *regs;
 	char buffer[CHAR_DEVICE_SIZE];
-	char pid_buffer[CHAR_DEVICE_SIZE];
+	char data_buffer[CHAR_DEVICE_SIZE];
 	int size;
+	int pid;
 	int irq_num;
 	struct mutex mutex_lock;
 	struct miscdevice misc;
@@ -78,14 +82,10 @@ static int release_misc(struct inode *inode, struct file *filep)
 static irqreturn_t irq_handler(int irq, void *dev_id)
 {
 	struct altera_mpu *mpu = dev_id;
-	int pid = 0;
 	struct siginfo info;
    	struct task_struct *t;
 
-	if(kstrtoint(mpu->pid_buffer, 10, &pid) != 0)
-		return IRQ_HANDLED;
-
-        t = pid_task(find_vpid(pid), PIDTYPE_PID);
+        t = pid_task(find_vpid(mpu->pid), PIDTYPE_PID);
 	if(t == NULL)
 		return IRQ_HANDLED;
 
@@ -132,6 +132,9 @@ static int mpu_read(struct file *filep, char *buf, size_t count,
 static int mpu_write(struct file *filep, const char *buf,
 			  size_t count, loff_t *offp)
 {
+	int i = 0;
+	int result = 0;
+        char values_to_write[TOLERANCE_CONFIG_SIZE+1];
 	struct altera_mpu *mpu = container_of(filep->private_data,
 					   struct altera_mpu, misc);
 
@@ -142,13 +145,20 @@ static int mpu_write(struct file *filep, const char *buf,
 		count = CHAR_DEVICE_SIZE - *offp;
 
 	if (count > 0) {
-		count = count - copy_from_user(mpu->pid_buffer + *offp,
+		count = count - copy_from_user(mpu->data_buffer + *offp,
 					       buf,
 					       count);
 	}
 
-    memcpy_fromio(mpu->buffer, mpu->regs, CHAR_DEVICE_SIZE);
+        // value to write
+        for (i = TOLERANCE_CONFIG_SIZE; i < TOLERANCE_CONFIG_SIZE; i++)
+        {
+            values_to_write[i-TOLERANCE_CONFIG_SIZE] = mpu->data_buffer[i];
+        }
 
+	result = kstrtoint(&mpu->data_buffer[PID_OFFSET], 10, &mpu->pid);
+
+        iowrite32((u32)values_to_write, mpu->regs + TOLERANCE_CONFIG_OFFSET);
 	*offp += count;
 	return count;
 }
