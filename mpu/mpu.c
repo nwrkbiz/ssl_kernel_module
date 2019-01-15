@@ -34,7 +34,7 @@
 
 #define SIG_TEST 44	
 
-#define NUM_REGS 45
+#define NUM_REGS 25
 #define CHAR_DEVICE_SIZE ((NUM_REGS) * 4)
 
 struct altera_mpu {
@@ -164,6 +164,9 @@ static int mpu_write(struct file *filep, const char *buf,
 	result = kstrtoint(&mpu->data_buffer[PID_OFFSET], 10, &mpu->pid);
 
         iowrite32((u32)values_to_write, mpu->regs + TOLERANCE_CONFIG_OFFSET);
+
+	printk("Port: %d", mpu->pid);
+
 	*offp += count;
 	return count;
 }
