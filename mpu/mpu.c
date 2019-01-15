@@ -109,7 +109,7 @@ static int mpu_read(struct file *filep, char *buf, size_t count,
 			// copy accel data
 			for(i = 0; i < CHAR_DEVICE_SIZE; i++)
 			{
-				if(i < EVENT_TIME_OFFSET)
+				if(i < EVENT_TIME_OFFSET - 1)
 				{
 					mpu->buffer[i] = tmp[i];
 				}
