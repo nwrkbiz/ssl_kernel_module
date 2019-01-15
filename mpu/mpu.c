@@ -34,7 +34,7 @@
 
 #define SIG_TEST 44	
 
-#define NUM_REGS 25
+#define NUM_REGS 45
 #define CHAR_DEVICE_SIZE ((NUM_REGS) * 4)
 
 struct altera_mpu {
