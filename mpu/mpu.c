@@ -122,7 +122,7 @@ static int mpu_read(struct file *filep, char *buf, size_t count,
 			// copy timestamp
 			for(i = 0; i <= EVENT_REGS_SIZE - EVENT_TIME_OFFSET; i++)
 			{
-				mpu->buffer[EVENT_TIME_OFFSET - 1 + i] = tmp[TIME_OFFSET - 1 + i];
+				mpu->buffer[TIME_OFFSET - 1 + i] = tmp[EVENT_TIME_OFFSET - 1 + i];
 			}
 
 		}
