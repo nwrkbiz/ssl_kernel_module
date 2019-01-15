@@ -169,7 +169,7 @@ static int mpu_write(struct file *filep, const char *buf,
 	result = kstrtoint(&tmp[PID_OFFSET], 10, &mpu->pid);
 
 
-	printk("Port: %d\n", mpu->pid);
+	printk("PID set: %d\n", mpu->pid);
 
 	*offp += count;
 	return count;
