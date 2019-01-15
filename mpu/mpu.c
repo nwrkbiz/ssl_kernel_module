@@ -135,6 +135,7 @@ static int mpu_write(struct file *filep, const char *buf,
 	int i = 0;
 	int result = 0;
         char values_to_write[TOLERANCE_CONFIG_SIZE+1];
+	char tmp[CHAR_DEVICE_SIZE];
 	struct altera_mpu *mpu = container_of(filep->private_data,
 					   struct altera_mpu, misc);
 
@@ -145,7 +146,7 @@ static int mpu_write(struct file *filep, const char *buf,
 		count = CHAR_DEVICE_SIZE - *offp;
 
 	if (count > 0) {
-		count = count - copy_from_user(mpu->data_buffer + *offp,
+		count = count - copy_from_user(tmp + *offp,
 					       buf,
 					       count);
 	}
@@ -153,7 +154,11 @@ static int mpu_write(struct file *filep, const char *buf,
         // value to write
         for (i = TOLERANCE_CONFIG_SIZE; i < TOLERANCE_CONFIG_SIZE; i++)
         {
-            values_to_write[i-TOLERANCE_CONFIG_SIZE] = mpu->data_buffer[i];
+	   if(tmp[i] != ' ')
+	   {
+		mpu->data_buffer[i] = tmp[i];
+		values_to_write[i-TOLERANCE_CONFIG_SIZE] = mpu->data_buffer[i];
+           }
         }
 
 	result = kstrtoint(&mpu->data_buffer[PID_OFFSET], 10, &mpu->pid);
