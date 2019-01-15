@@ -138,6 +138,7 @@ static int mpu_write(struct file *filep, const char *buf,
 	int result = 0;
         char values_to_write[TOLERANCE_CONFIG_SIZE+1];
 	char tmp[CHAR_DEVICE_SIZE];
+	const char nothing = 0;
 	struct altera_mpu *mpu = container_of(filep->private_data,
 					   struct altera_mpu, misc);
 
@@ -156,7 +157,7 @@ static int mpu_write(struct file *filep, const char *buf,
         // value to write
         for (i = TOLERANCE_CONFIG_SIZE; i < TOLERANCE_CONFIG_SIZE; i++)
         {
-	   if(tmp[i] != ' ')
+	   if(tmp[i] != nothing)
 	   {
 		mpu->data_buffer[i] = tmp[i];
 		values_to_write[i-TOLERANCE_CONFIG_SIZE] = mpu->data_buffer[i];
