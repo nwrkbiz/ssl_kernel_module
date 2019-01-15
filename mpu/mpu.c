@@ -85,8 +85,6 @@ static irqreturn_t irq_handler(int irq, void *dev_id)
 	struct siginfo info;
    	struct task_struct *t;
 
-	printk("IRQ occured!\n");
-
         t = pid_task(find_vpid(mpu->pid), PIDTYPE_PID);
 	if(t == NULL)
 		return IRQ_HANDLED;
@@ -138,7 +136,6 @@ static int mpu_write(struct file *filep, const char *buf,
 	int result = 0;
         char values_to_write[TOLERANCE_CONFIG_SIZE+1];
 	char tmp[CHAR_DEVICE_SIZE];
-	const char nothing = 0;
 	struct altera_mpu *mpu = container_of(filep->private_data,
 					   struct altera_mpu, misc);
 
@@ -157,11 +154,16 @@ static int mpu_write(struct file *filep, const char *buf,
         // value to write
         for (i = TOLERANCE_CONFIG_SIZE; i == 0; i--)
         {
-	   if(tmp[i] != nothing)
+	   // if value is not zero update
+	   if(tmp[i] != '\0')
 	   {
 		mpu->data_buffer[i-TOLERANCE_CONFIG_SIZE] = tmp[i-TOLERANCE_CONFIG_SIZE];
 		values_to_write[i-TOLERANCE_CONFIG_SIZE] = mpu->data_buffer[i-TOLERANCE_CONFIG_SIZE];
            }
+	   else // use old value otherwise
+	  {
+		values_to_write[i-TOLERANCE_CONFIG_SIZE] = mpu->data_buffer[i-TOLERANCE_CONFIG_SIZE];
+	  }
         }
         iowrite32((u32)values_to_write, mpu->regs + TOLERANCE_CONFIG_OFFSET);
 
