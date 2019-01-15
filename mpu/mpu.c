@@ -28,52 +28,36 @@
 #include <asm/siginfo.h>	
 
 #define DRIVER_NAME "mpu"
-#define PID_OFFSET 13
-#define TOLERANCE_CONFIG_OFFSET 24
-#define TOLERANCE_CONFIG_SIZE PID_OFFSET - 1 
 
+// Array definitions
+#define CHAR_DEVICE_SIZE 22
+#define CONFIG_SIZE 15
+#define EVENT_OFFSET 9
+#define PID_OFFSET 10
+#define TIME_OFFSET 19
+
+// Register definitions
+#define NUM_REGS 45
+#define CONFIG_OFFSET 22
+#define EVENT_REGS_OFFSET 37
+#define EVENT_REGS_SIZE 10
+#define EVENT_TIME_OFFSET 7
+
+// custom signal
 #define SIG_TEST 44	
 
-#define NUM_REGS 45
-#define CHAR_DEVICE_SIZE ((NUM_REGS) * 4)
+
 
 struct altera_mpu {
 	void *regs;
 	char buffer[CHAR_DEVICE_SIZE];
-	char data_buffer[CHAR_DEVICE_SIZE];
+	char config_buffer[CONFIG_SIZE];
 	int size;
 	int pid;
 	int irq_num;
-	struct mutex mutex_lock;
+	bool event;
 	struct miscdevice misc;
 };
-
-/*
- * @brief Lock character device if opened once.
- * @return EBUSY if device is already opened.
- */
-/* static int lock_misc(struct inode *inode, struct file *filep)
-{
-	struct altera_mpu *mpu = container_of(filep->private_data,
-				       struct altera_mpu, misc);
-
-	if (!mutex_trylock(&mpu->mutex_lock))
-		return -EBUSY;
-
-	return 0;
-}*/
-
-/*
- * @brief Unlock character device after closing it.
- */
-/*static int release_misc(struct inode *inode, struct file *filep)
-{
-	struct altera_mpu *mpu = container_of(filep->private_data,
-				       struct altera_mpu, misc);
-
-	mutex_unlock(&mpu->mutex_lock);
-	return 0;
-}*/
 
 
 /*
@@ -106,6 +90,8 @@ static irqreturn_t irq_handler(int irq, void *dev_id)
 static int mpu_read(struct file *filep, char *buf, size_t count,
 			 loff_t *offp)
 {
+	char tmp[CHAR_DEVICE_SIZE];
+	int i = 0;
 	struct altera_mpu *mpu = container_of(filep->private_data,
 					   struct altera_mpu, misc);
 
@@ -116,7 +102,37 @@ static int mpu_read(struct file *filep, char *buf, size_t count,
 		count = CHAR_DEVICE_SIZE - *offp;
 
 	if (count > 0) {
-        memcpy_fromio(mpu->buffer, mpu->regs, CHAR_DEVICE_SIZE);
+		if(mpu->event)
+		{
+			// get data form event fifo
+        		memcpy_fromio(tmp, mpu->regs + EVENT_REGS_OFFSET, EVENT_REGS_SIZE);
+			// copy accel data
+			for(i = 0; i < CHAR_DEVICE_SIZE; i++)
+			{
+				if(i < EVENT_TIME_OFFSET)
+				{
+					mpu->buffer[i] = tmp[i];
+				}
+				else
+				{
+					mpu->buffer[i] = '\0'; // set all other sensor data zero
+				}
+			}
+
+			// copy timestamp
+			for(i = 0; i <= EVENT_REGS_SIZE - EVENT_TIME_OFFSET; i++)
+			{
+				mpu->buffer[EVENT_TIME_OFFSET - 1 + i] = tmp[TIME_OFFSET - 1 + i];
+			}
+
+		}
+		else
+		{
+			// copy all data from streaming fifo
+     			memcpy_fromio(mpu->buffer, mpu->regs, CHAR_DEVICE_SIZE);
+		}
+
+		// hand data to userspace
 		count = count - copy_to_user(buf,
 					     mpu->buffer + *offp,
 					     count);
@@ -134,16 +150,16 @@ static int mpu_write(struct file *filep, const char *buf,
 {
 	int i = 0;
 	int result = 0;
-        char values_to_write[TOLERANCE_CONFIG_SIZE+1];
-	char tmp[CHAR_DEVICE_SIZE];
+        char values_to_write[CONFIG_SIZE];
+	char tmp[CONFIG_SIZE+1];
 	struct altera_mpu *mpu = container_of(filep->private_data,
 					   struct altera_mpu, misc);
 
-	if ((*offp < 0) || (*offp >= CHAR_DEVICE_SIZE))
+	if ((*offp < 0) || (*offp >= CONFIG_SIZE))
 		return -EINVAL;
 
-	if ((*offp + count) > CHAR_DEVICE_SIZE)
-		count = CHAR_DEVICE_SIZE - *offp;
+	if ((*offp + count) > CONFIG_SIZE)
+		count = CONFIG_SIZE - *offp;
 
 	if (count > 0) {
 		count = count - copy_from_user(tmp + *offp,
@@ -152,25 +168,33 @@ static int mpu_write(struct file *filep, const char *buf,
 	}
 
         // value to write
-        for (i = TOLERANCE_CONFIG_SIZE; i == 0; i--)
+        for (i = 0; i < CONFIG_SIZE; i++)
         {
 	   // if value is not zero update
 	   if(tmp[i] != '\0')
 	   {
-		mpu->data_buffer[i-TOLERANCE_CONFIG_SIZE] = tmp[i-TOLERANCE_CONFIG_SIZE];
-		values_to_write[i-TOLERANCE_CONFIG_SIZE] = mpu->data_buffer[i-TOLERANCE_CONFIG_SIZE];
+		mpu->config_buffer[i] = tmp[i];
+		values_to_write[i] = mpu->config_buffer[i];
            }
 	   else // use old value otherwise
 	  {
-		values_to_write[i-TOLERANCE_CONFIG_SIZE] = mpu->data_buffer[i-TOLERANCE_CONFIG_SIZE];
+		values_to_write[i] = mpu->config_buffer[i];
 	  }
         }
-        iowrite32((u32)values_to_write, mpu->regs + TOLERANCE_CONFIG_OFFSET);
+	memcpy_toio(mpu->regs + CONFIG_OFFSET, values_to_write, EVENT_REGS_OFFSET - CONFIG_OFFSET);
+	tmp[CONFIG_SIZE] = '\0';
+	if(tmp[EVENT_OFFSET] == '1')
+	{	mpu->event = true; }
+	else
+	{	mpu->event = false;}
 
+	// for convenience
+	for(i = PID_OFFSET; i < CONFIG_SIZE;i++)
+		if(tmp[i] < '0' || tmp[i] > '9')
+			tmp[i] = '\0';
+	
 	// set PID
 	result = kstrtoint(&tmp[PID_OFFSET], 10, &mpu->pid);
-
-
 	printk("PID set: %d\n", mpu->pid);
 
 	*offp += count;
@@ -181,8 +205,6 @@ static const struct file_operations mpu_fops = {
 	.owner = THIS_MODULE,
 	.read = mpu_read,
 	.write = mpu_write,
-	//.open = lock_misc,
-	//.release = release_misc
 };
 
 static int mpu_probe(struct platform_device *pdev)
@@ -220,7 +242,6 @@ static int mpu_probe(struct platform_device *pdev)
 		return retval;
 	}
 
-	mutex_init(&mpu->mutex_lock);
 	dev_info(&pdev->dev, "mpu driver loaded!");
 
 	return 0;
