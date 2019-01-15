@@ -1,0 +1,20 @@
+Load kernelmodule:
+----------------------------
+root@cyclone5:~# insmod sigtest.ko
+
+
+
+Start userspace App as background process:
+---------------------------------------------------------------
+root@cyclone5:~# ./userspace_test &
+[1] 1657
+root@cyclone5:~# 1657
+
+
+
+Pass userspace PID to kernelmodule (this will send a signal to the userspace app):
+-------------------------------------------------------------------------------------------------------------------
+root@cyclone5:~# echo -n "1657" > /dev/sigtest 
+received signal 1234
+Program will exit now :)
+[1]+  Done                    ./userspace_test
