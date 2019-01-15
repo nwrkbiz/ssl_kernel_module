@@ -52,7 +52,7 @@ struct altera_mpu {
  * @brief Lock character device if opened once.
  * @return EBUSY if device is already opened.
  */
-static int lock_misc(struct inode *inode, struct file *filep)
+/* static int lock_misc(struct inode *inode, struct file *filep)
 {
 	struct altera_mpu *mpu = container_of(filep->private_data,
 				       struct altera_mpu, misc);
@@ -61,19 +61,19 @@ static int lock_misc(struct inode *inode, struct file *filep)
 		return -EBUSY;
 
 	return 0;
-}
+}*/
 
 /*
  * @brief Unlock character device after closing it.
  */
-static int release_misc(struct inode *inode, struct file *filep)
+/*static int release_misc(struct inode *inode, struct file *filep)
 {
 	struct altera_mpu *mpu = container_of(filep->private_data,
 				       struct altera_mpu, misc);
 
 	mutex_unlock(&mpu->mutex_lock);
 	return 0;
-}
+}*/
 
 
 /*
@@ -172,8 +172,8 @@ static const struct file_operations mpu_fops = {
 	.owner = THIS_MODULE,
 	.read = mpu_read,
 	.write = mpu_write,
-	.open = lock_misc,
-	.release = release_misc
+	//.open = lock_misc,
+	//.release = release_misc
 };
 
 static int mpu_probe(struct platform_device *pdev)
