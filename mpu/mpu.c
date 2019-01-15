@@ -97,6 +97,8 @@ static irqreturn_t irq_handler(int irq, void *dev_id)
 	/* Tell userspace that IRQ occured */
 	send_sig_info(SIG_TEST, &info, t);
 
+	printk("IRQ occured!\n");
+
 	return IRQ_HANDLED;
 }
 
@@ -165,7 +167,7 @@ static int mpu_write(struct file *filep, const char *buf,
 
         iowrite32((u32)values_to_write, mpu->regs + TOLERANCE_CONFIG_OFFSET);
 
-	printk("Port: %d", mpu->pid);
+	printk("Port: %d\n", mpu->pid);
 
 	*offp += count;
 	return count;
