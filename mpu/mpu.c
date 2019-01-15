@@ -155,18 +155,19 @@ static int mpu_write(struct file *filep, const char *buf,
 	}
 
         // value to write
-        for (i = TOLERANCE_CONFIG_SIZE; i < TOLERANCE_CONFIG_SIZE; i++)
+        for (i = TOLERANCE_CONFIG_SIZE; i == 0; i--)
         {
 	   if(tmp[i] != nothing)
 	   {
-		mpu->data_buffer[i] = tmp[i];
-		values_to_write[i-TOLERANCE_CONFIG_SIZE] = mpu->data_buffer[i];
+		mpu->data_buffer[i-TOLERANCE_CONFIG_SIZE] = tmp[i-TOLERANCE_CONFIG_SIZE];
+		values_to_write[i-TOLERANCE_CONFIG_SIZE] = mpu->data_buffer[i-TOLERANCE_CONFIG_SIZE];
            }
         }
-
-	result = kstrtoint(&mpu->data_buffer[PID_OFFSET], 10, &mpu->pid);
-
         iowrite32((u32)values_to_write, mpu->regs + TOLERANCE_CONFIG_OFFSET);
+
+	// set PID
+	result = kstrtoint(&tmp[PID_OFFSET], 10, &mpu->pid);
+
 
 	printk("Port: %d\n", mpu->pid);
 
