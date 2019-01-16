@@ -9,19 +9,46 @@
 #define SIG_TEST 44 // we define our own signal
 
 
-// callback function for signal
-void receiveData(int n, siginfo_t *info, void *unused) {
-	printf("received signal %i\n", info->si_int);
-	printf("Program will exit now :)\n");
-	exit(0);
-}
+// "header file"
+class SigObj {
+    
+	static SigObj* c_Me;
+  public:
+
+	// ctor
+	SigObj()
+	{
+		struct sigaction sig;
+		sig.sa_sigaction = receiveData; // register signal callback function
+		sig.sa_flags = SA_SIGINFO; // signal type
+		c_Me = this;
+		sigaction(SIG_TEST, &sig, NULL); // custom signal SIG_TEST (needs to be the same as in kernel module)
+	}
+
+	void printOut()
+	{
+		printf("Program will exit now :)\n");
+	}
+
+	// callback function for signal
+	static void receiveData(int n, siginfo_t *info, void *nothing) {
+
+		printf("received signal %i\n", info->si_int);
+
+		c_Me->printOut();
+
+		exit(0);
+	}
+};
+
+// needs to be on top in cpp file
+SigObj* SigObj::c_Me = NULL;
+
 
 int main ( int argc, char **argv )
 {
-	struct sigaction sig;
-	sig.sa_sigaction = receiveData; // register signal callback function
-	sig.sa_flags = SA_SIGINFO; // signal type
-	sigaction(SIG_TEST, &sig, NULL); // custom signal SIG_TEST (needs to be the same as in kernel module)
+
+	SigObj mySig;
 
 	// print pid to stdout for convenience
 	printf("%i\n", getpid());
