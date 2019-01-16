@@ -42,6 +42,7 @@ class SigObj {
 			c_Me->printOut();
 			exit(0);
 		}
+		sleep(15);
 	}
 };
 
@@ -62,6 +63,8 @@ int main ( int argc, char **argv )
 		// do some fancy work here
 		// signal will stop executing this work 
 		// and calls callback function
+		sleep(5);
+		printf("%i\n", getpid());
 	};
 
 	return 0;
