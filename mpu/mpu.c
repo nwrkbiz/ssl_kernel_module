@@ -69,6 +69,8 @@ static irqreturn_t irq_handler(int irq, void *dev_id)
 	struct siginfo info;
    	struct task_struct *t;
 
+	printk("IRQ Occured!\n");
+
         t = pid_task(find_vpid(mpu->pid), PIDTYPE_PID);
 	if(t == NULL)
 		return IRQ_HANDLED;
@@ -80,6 +82,8 @@ static irqreturn_t irq_handler(int irq, void *dev_id)
 
 	/* Tell userspace that IRQ occured */
 	send_sig_info(SIG_TEST, &info, t);
+
+	printk("Signal sent!\n");
 
 	return IRQ_HANDLED;
 }
