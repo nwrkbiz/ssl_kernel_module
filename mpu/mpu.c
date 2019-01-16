@@ -31,9 +31,9 @@
 
 // Array definitions
 #define CHAR_DEVICE_SIZE 22
-#define CONFIG_SIZE 15
-#define EVENT_OFFSET 9
-#define PID_OFFSET 10
+#define CONFIG_SIZE 21
+#define EVENT_OFFSET 15
+#define PID_OFFSET 16
 #define TIME_OFFSET 19
 
 // Register definitions
