@@ -12,6 +12,8 @@
 // "header file"
 class SigObj {
     
+  private:
+	int m_Cnt = 0;
 	static SigObj* c_Me;
   public:
 
@@ -33,11 +35,13 @@ class SigObj {
 	// callback function for signal
 	static void receiveData(int n, siginfo_t *info, void *nothing) {
 
-		printf("received signal %i\n", info->si_int);
+		printf("received signal %i count is %d \n", info->si_int, c_Me->m_Cnt);
 
-		c_Me->printOut();
-
-		exit(0);
+		if(c_Me->m_Cnt++ > 5)
+		{
+			c_Me->printOut();
+			exit(0);
+		}
 	}
 };
 
